@@ -4,17 +4,509 @@ My Cryptographic Library
 FILE:   myCrypto.c     SKELETON
 
 Written By: 
-     1- YOU  MUST   WRITE 
-	 2- FULL NAMES  HERE   (or risk losing points )
+     1- Ash Rauch
+	 2- Christian Guerrero
 Submitted on: 
-     Insert the date of Submission here
-	 
+    11/23/25
 ----------------------------------------------------------------------------*/
 
 #include "myCrypto.h"
 
 //
 //  ALL YOUR  CODE FORM  PREVIOUS PAs  and pLABs
+
+//***********************************************************************
+// pLAB-01
+//***********************************************************************
+
+void handleErrors( char *msg)
+{
+    fprintf( stderr , "\n%s\n" , msg ) ;
+    ERR_print_errors_fp(stderr);
+    exit(-1);
+}
+
+
+unsigned encrypt( uint8_t *pPlainText, unsigned plainText_len, 
+    const uint8_t *key, const uint8_t *iv, uint8_t *pCipherText )
+{
+    int status;
+    unsigned len = 0, encryptedLen = 0;
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if(!ctx)
+    handleErrors("encrypt: failed to creat CTX");
+
+    status = EVP_EncryptInit_ex(ctx, ALGORITHM(), NULL, key, iv);
+    if( status != 1 )
+    handleErrors("encrypt: failed to EncryptInit_ex");
+
+    status = EVP_EncryptUpdate(ctx, pCipherText, &len, pPlainText, plainText_len);
+    if( status != 1 )
+    handleErrors("encrypt: failed to EncryptUpdate");
+    encryptedLen += len;
+
+    pCipherText += len;
+
+    status = EVP_EncryptFinal_ex(ctx, pCipherText, &len);
+    if( status != 1 )
+    handleErrors("encrypt: failed to EncryptFinal_ex");
+    encryptedLen += len;
+
+    EVP_CIPHER_CTX_free(ctx);
+
+    return encryptedLen;
+}
+
+
+unsigned decrypt(uint8_t *pCipherText, unsigned cipherText_len, 
+    const uint8_t *key, const uint8_t *iv, uint8_t *pDecryptedText)
+{
+    int status ;
+    unsigned len=0 , decryptedLen=0 ;
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new() ;
+    if( ! ctx )
+    handleErrors("decrypt: failed to creat CTX");
+
+    status = EVP_DecryptInit_ex( ctx, ALGORITHM(), NULL, key, iv ) ;
+    if( status != 1 )
+    handleErrors("decrypt: failed to DecryptInit_ex");
+
+    status = EVP_DecryptUpdate( ctx, pDecryptedText, &len, pCipherText, cipherText_len) ;
+    if( status != 1 )
+    handleErrors("decrypt: failed to DecryptUpdate");
+    decryptedLen += len;
+
+    pDecryptedText += len ;
+
+    status = EVP_DecryptFinal_ex( ctx, pDecryptedText , &len ) ;
+    if( status != 1 )
+    handleErrors("decrypt: failed to DecryptFinal_ex");
+    decryptedLen += len;
+
+    EVP_CIPHER_CTX_free(ctx);
+
+    return decryptedLen;
+}
+
+
+static unsigned char plaintext[PLAINTEXT_LEN_MAX];
+static unsigned char ciphertext[CIPHER_LEN_MAX];
+static unsigned char decryptext[DECRYPTED_LEN_MAX];
+static int write_all(int fd, const void *buf, size_t n) {
+    const unsigned char *p = buf;
+    size_t off = 0;
+    while (off < n) {
+        ssize_t w = write(fd, p + off, n - off);
+        if (w < 0) { if (errno == EINTR) continue; return -1; }
+        off += (size_t)w;
+    }
+    return 0;
+}
+
+
+int encryptFile( int fd_in, int fd_out, const uint8_t *key, const uint8_t *iv )
+{
+    int status;
+    unsigned len = 0, encryptedLen = 0; 
+    ssize_t readSize;
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new() ;
+    if( ! ctx )
+    handleErrors("encrypt: failed to creat CTX");
+
+    if( EVP_EncryptInit_ex( ctx, ALGORITHM(), NULL, key, iv ) != 1)
+        handleErrors("encrypt: failed to EncryptInit_ex");
+
+    while( (readSize = read(fd_in, plaintext, sizeof(plaintext))) > 0)
+    {
+        if( EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, readSize) != 1)
+            handleErrors("encrypt: failed to EncryptUpdate");
+        encryptedLen += len;
+
+        if (len > 0 && write_all(fd_out, ciphertext, (size_t)len) < 0)
+            handleErrors("encrypt: write failed");
+    }
+
+    
+    if (readSize < 0 && errno != 0)
+        handleErrors("encrypt: read failed");
+
+    if (EVP_EncryptFinal_ex(ctx, ciphertext, &len) != 1)
+        handleErrors("encrypt: EncryptFinal_ex failed");
+    if (len > 0 && write_all(fd_out, ciphertext, (size_t)len) < 0)
+        handleErrors("encrypt: write(final) failed");
+
+    EVP_CIPHER_CTX_free(ctx);
+    encryptedLen += len;
+    return encryptedLen;
+}
+
+
+int decryptFile( int fd_data, int fd_out, const uint8_t *key, const uint8_t *iv )
+{
+    int status;
+    unsigned len = 0, decryptedLen = 0;
+    ssize_t readSize;
+    EVP_CIPHER_CTX *ctx;
+
+    if(!(ctx = EVP_CIPHER_CTX_new()))
+        handleErrors("decrypt: failed to create ctx");
+
+    if( 1 != EVP_DecryptInit_ex(ctx, ALGORITHM(), NULL, key, iv))
+        handleErrors("decrypt: failed to decryptInit");
+
+    while( (readSize = read(fd_data, ciphertext, sizeof(ciphertext))) > 0)
+    {
+        if( EVP_DecryptUpdate(ctx, decryptext, &len, ciphertext, readSize) != 1)
+            handleErrors("decrypt: failed to decryptUpdate");
+            decryptedLen += len;
+
+        if (len > 0 && write_all(fd_out, decryptext, (size_t)len) < 0)
+            handleErrors("decrypt: write failed");
+    }
+
+    if(readSize < 0 && errno != 0)
+        handleErrors("decrypt: read failed");
+
+    
+    if (EVP_DecryptFinal_ex(ctx, decryptext, &len) != 1)
+        handleErrors("decrypt: DecryptFinal_ex failed");
+    if (len > 0 && write_all(fd_out, decryptext, (size_t)len) < 0)
+        handleErrors("decrypt: write(final) failed");
+
+    EVP_CIPHER_CTX_free(ctx);
+    decryptedLen += len;
+    return decryptedLen;
+
+
+}
+
+
+EVP_PKEY *getRSAfromFile(char * filename, int public)
+{
+    FILE * fp = fopen(filename,"rb");
+    if (fp == NULL)
+    {
+        fprintf( stderr , "getRSAfromFile: Unable to open RSA key file %s \n",filename);
+        return NULL;    
+    }
+
+    EVP_PKEY *key = EVP_PKEY_new() ;
+    if ( public )
+        key = PEM_read_PUBKEY( fp, &key , NULL , NULL );
+    else
+        key = PEM_read_PrivateKey( fp , &key , NULL , NULL );
+ 
+    fclose( fp );
+
+    return key;
+}
+
+//***********************************************************************
+// PA-02
+//***********************************************************************
+
+int privKeySign( uint8_t **sig , size_t *sigLen , EVP_PKEY  *privKey , 
+                 uint8_t *inData , size_t inLen ) 
+{
+    if (!sig || !sigLen || !privKey || !inData || inLen == 0) return 0;
+
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(privKey, NULL);
+    if (!ctx) return 0;
+
+    int ok = 0;
+    do {
+        if (EVP_PKEY_sign_init(ctx) <= 0) break;
+
+        if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0) break;
+        if (EVP_PKEY_CTX_set_signature_md(ctx, HASH_ALGORITHM()) <= 0) break;
+
+        size_t outLen = 0;
+        if (EVP_PKEY_sign(ctx, NULL, &outLen, inData, inLen) <= 0) break;
+
+        uint8_t *out = (uint8_t*)malloc(outLen);
+        if (!out) break;
+
+        if (EVP_PKEY_sign(ctx, out, &outLen, inData, inLen) <= 0) {
+            free(out);
+            break;
+        }
+
+        *sig = out;
+        *sigLen = outLen;
+        ok = 1;
+    } while (0);
+
+    EVP_PKEY_CTX_free( ctx );
+
+    return ok;
+}
+
+
+int pubKeyVerify( uint8_t *sig , size_t sigLen , EVP_PKEY  *pubKey 
+           , uint8_t *data , size_t dataLen ) 
+{
+    if ( !sig || sigLen == 0 || !pubKey  ||  !data || dataLen == 0 )
+    {
+        printf(  "\n******* pkeySign received some NULL pointers\n" ); 
+        return 0 ; 
+    }
+
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(pubKey, NULL);
+    if (!ctx) return 0;
+
+    int decision = 0;
+
+    if (EVP_PKEY_verify_init(ctx) > 0 &&
+        EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) > 0 &&
+        EVP_PKEY_CTX_set_signature_md(ctx, HASH_ALGORITHM()) > 0)
+    {
+        decision = EVP_PKEY_verify(ctx, sig, sigLen, data, dataLen);
+        if (decision < 0) decision = 0;
+    }
+
+    EVP_PKEY_CTX_free(ctx);
+
+    return decision ;
+}
+
+
+size_t fileDigest( int fd_in , int fd_out , uint8_t *digest )
+{
+    if (fd_in < 0 || !digest) return 0;
+
+    EVP_MD_CTX *mdCtx = EVP_MD_CTX_new();
+    if (!mdCtx) handleErrors("fileDigest: EVP_MD_CTX_new failed");
+
+    if (EVP_DigestInit_ex(mdCtx, HASH_ALGORITHM(), NULL) != 1) {
+        EVP_MD_CTX_free(mdCtx);
+        return 0;
+    }
+
+    unsigned char buf[8192];
+    for (;;) {
+        ssize_t r = read(fd_in, buf, sizeof(buf));
+        if (r < 0) { if (errno == EINTR) continue; EVP_MD_CTX_free(mdCtx); return 0; }
+        if (r == 0) break;
+
+        if (EVP_DigestUpdate(mdCtx, buf, (size_t)r) != 1) { EVP_MD_CTX_free(mdCtx); return 0; }
+
+        if (fd_out > 0) {
+            size_t off = 0;
+            while (off < (size_t)r) {
+                ssize_t w = write(fd_out, buf + off, (size_t)r - off);
+                if (w < 0) { if (errno == EINTR) continue; EVP_MD_CTX_free(mdCtx); return 0; }
+                off += (size_t)w;
+            }
+        }
+    }
+
+    unsigned int mdLen = 0;
+    if (EVP_DigestFinal_ex(mdCtx, digest, &mdLen) != 1) { EVP_MD_CTX_free(mdCtx); return 0; }
+    EVP_MD_CTX_free(mdCtx);
+    return (size_t)mdLen;
+}
+
+//***********************************************************************
+// PA-04  Part  One
+//***********************************************************************
+
+void exitError( char *errText )
+{
+    fprintf( stderr , "%s\n" , errText ) ;
+    exit(-1) ;
+}
+
+//-----------------------------------------------------------------------------
+// Utility to read Key/IV from a file
+// Return:  1 on success, or 0 on failure
+
+int getKeyFromFile( char *keyF , myKey_t *x )
+{
+    int   fd_key  ;
+    
+    fd_key = open( keyF , O_RDONLY )  ;
+    if( fd_key == -1 ) 
+    { 
+        fprintf( stderr , "\nCould not open key file '%s'\n" , keyF ); 
+        return 0 ; 
+    }
+
+    // first, read the symmetric encryption key
+	if( SYMMETRIC_KEY_LEN  != read ( fd_key , x->key , SYMMETRIC_KEY_LEN ) ) 
+    { 
+        fprintf( stderr , "\nCould not read key from file '%s'\n" , keyF ); 
+        return 0 ; 
+    }
+
+    // Next, read the Initialialzation Vector
+    if ( INITVECTOR_LEN  != read ( fd_key , x->iv , INITVECTOR_LEN ) ) 
+    { 
+        fprintf( stderr , "\nCould not read the IV from file '%s'\n" , keyF ); 
+        return 0 ; 
+    }
+	
+    close( fd_key ) ;
+    
+    return 1;  //  success
+}
+
+//-----------------------------------------------------------------------------
+// Allocate & Build a new Message #1 from Amal to the KDC 
+// Where Msg1 is:  Len(A)  ||  A  ||  Len(B)  ||  B  ||  Na
+// All Len(*) fields are size_t integers
+// Set *msg1 to point at the newly built message
+// Msg1 is not encrypted
+// Returns the size (in bytes) of Message #1 
+
+size_t MSG1_new ( FILE *log , uint8_t **msg1 , const char *IDa , const char *IDb , const Nonce_t Na )
+{
+
+    //  Check agains any NULL pointers in the arguments
+    if ( log == NULL || msg1 == NULL || IDa == NULL || IDb == NULL || Na == NULL ) {
+        fprintf( log , "NULL pointer argument passed to MSG1_new()\n" );
+        exitError( "NULL pointer argument passed to MSG1_new()" );
+        fflush(log);
+    }
+
+
+    size_t  LenA    = strlen( IDa ) + 1;
+    size_t  LenB    = strlen( IDb ) + 1;
+    size_t  LenMsg1 = sizeof(LenA) + LenA + sizeof(LenB) + LenB + NONCELEN; //  number of bytes in the completed MSG1 ;;
+
+    // Allocate memory for msg1. MUST always check malloc() did not fail
+    *msg1 = (uint8_t *) malloc( LenMsg1 ) ;
+    if ( *msg1 == NULL ) {
+        fprintf( log , "Out of Memory allocating %lu bytes for MSG1 in MSG1_new()\n" , LenMsg1 );
+        exitError( "Out of Memory allocating MSG1 in MSG1_new()" );
+        fflush(log);
+    }
+    // Fill in Msg1:  Len( IDa )  ||  IDa   ||  Len( IDb )  ||  IDb   ||  Na
+  uint8_t *p = *msg1;
+
+    // Fill message: Len(A) || A || Len(B) || B || Na
+    memcpy(p, &LenA, sizeof(size_t));
+    p += sizeof(size_t);
+
+    memcpy(p, IDa, LenA);
+    p += LenA;
+
+    memcpy(p, &LenB, sizeof(size_t));
+    p += sizeof(size_t);
+
+    memcpy(p, IDb, LenB);
+    p += LenB;
+
+    memcpy(p, Na, NONCELEN);
+    p += NONCELEN;
+
+
+    fprintf( log , "The following new MSG1 ( %lu bytes ) has been created by MSG1_new ():\n" , LenMsg1 ) ;
+    // BIO_dumpt the completed MSG1 indented 4 spaces to the right
+    BIO_dump_indent_fp( log, *msg1, LenMsg1, 4 );
+    fprintf( log , "\n" ) ;
+    fflush( log ) ;
+    
+    return LenMsg1 ;
+}
+
+//-----------------------------------------------------------------------------
+// Receive Message #1 by the KDC from Amal via the pipe's file descriptor 'fd'
+// Parse the incoming msg1 into the values IDa, IDb, and Na
+
+void  MSG1_receive( FILE *log , int fd , char **IDa , char **IDb , Nonce_t Na )
+{
+
+    //  Check agains any NULL pointers in the arguments
+    if ( log == NULL || IDa == NULL || IDb == NULL || Na == NULL ) {
+        fprintf( log , "NULL pointer argument passed to MSG1_receive()\n" );
+        exitError( "NULL pointer argument passed to MSG1_receive()" );
+    }
+
+    size_t LenMsg1 = 0, LenA , lenB ;
+	// Throughout this function, don't forget to update LenMsg1 as you receive its components
+    // Read in the components of Msg1:  Len(IDa)  ||  IDa  ||  Len(IDb)  ||  IDb  ||  Na
+
+    // 1) Read Len(ID_A)  from the pipe ... But on failure to read Len(IDa): 
+    if( read( fd, &LenA, LENSIZE ) != LENSIZE )
+    {
+        fprintf( log , "Unable to receive all %lu bytes of Len(IDA) "
+                       "in MSG1_receive() ... EXITING\n" , LENSIZE );
+        
+        fflush( log ) ;  fclose( log ) ;   
+        exitError( "Unable to receive all bytes LenA in MSG1_receive()" );
+    }
+    LenMsg1 += LENSIZE ;
+    
+    // 2) Allocate memory for ID_A ... But on failure to allocate memory:
+    if( ( *IDa = malloc( LenA + 1 ) ) == NULL)
+    {
+        fprintf( log , "Out of Memory allocating %lu bytes for IDA in MSG1_receive() "
+                       "... EXITING\n" , LenA );
+        fflush( log ) ;  fclose( log ) ;
+        exitError( "Out of Memory allocating IDA in MSG1_receive()" );
+    }
+
+ 	// On failure to read ID_A from the pipe
+    if( read( fd, *IDa , LenA ) != LenA )
+    {
+        fprintf( log , "Out of Memory allocating %lu bytes for IDA in MSG1_receive() "
+                       "... EXITING\n" , LenA );
+        fflush( log ) ;  fclose( log ) ;
+        exitError( "Out of Memory allocating IDA in MSG1_receive()" );
+
+    }
+    LenMsg1 += LenA ;
+
+    // 3) Read Len( ID_B )  from the pipe    But on failure to read Len( ID_B ):
+    if( read( fd, &lenB , LENSIZE ) != LENSIZE )
+    {
+        fprintf( log , "Unable to receive all %lu bytes of Len(IDB) "
+                       "in MSG1_receive() ... EXITING\n" , LENSIZE );
+        
+        fflush( log ) ;  fclose( log ) ;   
+        exitError( "Unable to receive all bytes of LenB in MSG1_receive()" );
+    }
+    LenMsg1 += LENSIZE ;
+
+    // 4) Allocate memory for ID_B    But on failure to allocate memory:
+    if( ( *IDb = malloc( lenB + 1 ) ) == NULL)
+    {
+        fprintf( log , "Out of Memory allocating %lu bytes for IDB in MSG1_receive() "
+                       "... EXITING\n" , lenB );
+        fflush( log ) ;  fclose( log ) ;
+        exitError( "Out of Memory allocating IDB in MSG1_receive()" );
+    }
+
+ 	// Now, read IDb ... But on failure to read ID_B from the pipe
+    if( read( fd, *IDb , lenB ) != lenB )
+    {
+        fprintf( log , "Unable to receive all %lu bytes of IDB in MSG1_receive() "
+                       "... EXITING\n" , lenB );
+        fflush( log ) ;  fclose( log ) ;
+        exitError( "Unable to receive all bytes of IDB in MSG1_receive()" );
+    }
+    LenMsg1 += lenB ;
+    
+    // 5) Read Na   But on failure to read Na from the pipe
+    if ( read( fd, Na, NONCELEN ) != NONCELEN )
+    {
+        fprintf( log , "Unable to receive all %lu bytes of Na "
+                       "in MSG1_receive() ... EXITING\n" , NONCELEN );
+        
+        fflush( log ) ;  fclose( log ) ;   
+        exitError( "Unable to receive all bytes of Na in MSG1_receive()" );
+    }
+    LenMsg1 += NONCELEN ;
+ 
+    fprintf( log , "MSG1 ( %lu bytes ) has been received"
+                   " on FD %d by MSG1_receive():\n" ,  LenMsg1 , fd  ) ;   
+    fflush( log ) ;
+
+    return ;
+}
 
 
 //***********************************************************************

@@ -4,10 +4,10 @@ pa-04_PartTwo:  Intro to Enhanced Needham-Schroeder Key-Exchange with TWO-way Au
 FILE:   basim.c     SKELETON
 
 Written By: 
-     1- YOU  MUST   WRITE 
-	 2- FULL NAMES  HERE   (or risk losing points )
+     1- Ash Rauch
+	 2- Christian Guerrero
 Submitted on: 
-     Insert the date of Submission here
+    11/23/25
 ----------------------------------------------------------------------------*/
 
 #include <linux/random.h>
@@ -44,7 +44,61 @@ int main ( int argc , char * argv[] )
     
     
     // Your code from pa-04_PartOne
+    int       fd_A2B , fd_B2A   ;
+    FILE     *log ;
+
+    char *developerName = "Code by STUDENTS_LAST_NAMES" ;
+
+    fprintf( stdout , "Starting Basim's     %s\n" , developerName ) ;
+
+    if( argc < 3 )
+    {
+        printf("\nMissing command-line file descriptors: %s <getFr. Amal> "
+               "<sendTo Amal>\n\n", argv[0]) ;
+        exit(-1) ;
+    }
+
+    fd_A2B    = atoi(argv[1]) ;  // Read from Amal   File Descriptor
+    fd_B2A    = atoi(argv[2]) ;  // Send to   Amal   File Descriptor
     
+
+    log = fopen("basim/logBasim.txt" , "w" );
+    if( ! log )
+    {
+        fprintf( stderr , "Basim's %s. Could not create log file\n" , developerName ) ;
+        exit(-1) ;
+    }
+
+    BANNER( log ) ;
+    fprintf( log , "Starting Basim\n"  ) ;
+    BANNER( log ) ;
+
+    fprintf( log , "\n<readFrom Amal> FD=%d , <sendTo Amal> FD=%d\n\n" , fd_A2B , fd_B2A );
+
+    // Get Basim's master keys with the KDC
+    myKey_t   Kb ;   
+
+    if ( getKeyFromFile( "basim/basimKey.bin" , &Kb ) == 0 ) {
+        fprintf( stderr , "\nCould not get Basim's Master key & IV.\n" ) ;
+        fprintf( log ,    "\nCould not get Basim's Master key & IV.\n" ) ;
+        fclose(log); exit(-1);
+    }
+    fprintf( log , "Basim has this Master Kb { key , IV }\n" );
+    BIO_dump_indent_fp( log , (const char*)Kb.key , SYMMETRIC_KEY_LEN , 4 );
+    fprintf( log , "\n" );
+	BIO_dump_indent_fp( log , (const char*)Kb.iv  , INITVECTOR_LEN   , 4 );
+    fprintf( log , "\n" );
+
+
+    // Get Basim's pre-created Nonces: Nb
+	Nonce_t   Nb;  
+
+	getNonce4Basim(1, Nb);
+    fprintf( log , "Basim will use this Nonce:  Nb\n"  ) ;
+	BIO_dump_indent_fp( log , (const char*)Nb , NONCELEN , 4 );
+    fprintf( log , "\n" );
+
+    fflush( log ) ;
     
     
     //*************************************
