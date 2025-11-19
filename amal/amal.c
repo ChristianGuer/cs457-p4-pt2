@@ -1,7 +1,7 @@
 /*----------------------------------------------------------------------------
 pa-04_PartTwo:  Intro to Enhanced Needham-Schroeder Key-Exchange with TWO-way Authentication
 
-FILE:   amal.c     SKELETON
+FILE:   amal.c
 
 Written By: 
      1- Ash Rauch
