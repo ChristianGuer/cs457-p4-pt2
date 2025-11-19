@@ -128,15 +128,82 @@ int main ( int argc , char * argv[] )
     fflush( log ) ;
 
     
-    
-
-    //*************************************   
+   //*************************************   
     // Construct & Send    Message 2
     //*************************************
     // PA-04 Part Two
     BANNER( log ) ;
     fprintf( log , "         MSG2 New\n");
     BANNER( log ) ;
+
+    myKey_t Ks;
+    if( getKeyFromFile("kdc/sessionKey.bin", &Ks) == 0)
+    {
+        fprintf( stderr , "\nCould not get KDC's Symmetric key & IV.\n" ) ;
+        fprintf( log , "\nCould not get KDC's Symmetric key & IV.\n" ) ;
+        fclose( log ) ;
+        exit(-1) ;
+    } else{
+        // On success, print "Basim has this Master Kb { key , IV }\n" to the Log file
+        fprintf( log, "KDC: created this session key Ks { Key , IV } (%lu Bytes ) is:\n", KEYSIZE);
+        // BIO_dump the Key IV indented 4 spaces to the righ
+        unsigned char ks_bytes[KEYSIZE];
+        memcpy(ks_bytes, Ks.key, SYMMETRIC_KEY_LEN);
+        memcpy(ks_bytes + SYMMETRIC_KEY_LEN, Ks.iv, INITVECTOR_LEN);
+        BIO_dump_indent_fp(log, (const char *)ks_bytes, KEYSIZE, 4);
+        fprintf(log, "\n");
+
+    }
+
+    // make msg2
+    uint8_t *msg2 = NULL;
+    size_t LenMsg2 = MSG2_new(log, &msg2, &Ka, &Kb, &Ks, IDa, IDb, &Na);
+    if (LenMsg2 == 0) {
+        fprintf(stderr, "\nKDC failed to make msg2\n");
+        fprintf(log,   "\nKDC failed to make msg2\n");
+        fclose(log);
+        exit(-1);
+    }
+
+    // 1) First send the length of MSG2 as a size_t
+    size_t off = 0;
+    while (off < sizeof(size_t)) {
+        ssize_t n = write(fd_K2A, ((uint8_t *)&LenMsg2) + off,
+                        sizeof(size_t) - off);
+        if (n < 0) {
+            perror("KDC write LenMsg2 to Amal");
+            fprintf(log, "KDC: Unable to send LenMsg2 to Amal ... EXITING\n");
+            fflush(log);
+            free(msg2);
+            fclose(log);
+            exitError("KDC: Unable to send LenMsg2 to Amal");
+        }
+        off += (size_t)n;
+    }
+
+    // 2) Then send the MSG2 ciphertext itself
+    off = 0;
+    while (off < LenMsg2) {
+        ssize_t n = write(fd_K2A, msg2 + off, LenMsg2 - off);
+        if (n < 0) {
+            perror("KDC write MSG2 to Amal");
+            fprintf(log,
+                    "KDC: Unable to send all %zu bytes of MSG2 to Amal ... EXITING\n",
+                    LenMsg2);
+            fflush(log);
+            free(msg2);
+            fclose(log);
+            exitError("KDC: Unable to send all bytes of MSG2 to Amal");
+        }
+        off += (size_t)n;
+    }
+
+    fprintf(log, "The KDC sent the Encrypted MSG2 ( %zu bytes ) to Amal Successfully\n",
+            LenMsg2);
+    fflush(log);
+
+    free(msg2);
+    msg2 = NULL;
 
 
     //*************************************   

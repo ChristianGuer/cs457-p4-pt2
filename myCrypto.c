@@ -573,6 +573,7 @@ size_t MSG2_new( FILE *log , uint8_t **msg2, const myKey_t *Ka , const myKey_t *
 
     fprintf(log, "Plaintext Ticket (%lu Bytes) is\n", (unsigned long)tktPlainLen);
     BIO_dump_indent_fp(log, plaintext, tktPlainLen, 4);
+    fprintf(log, "\n");
 
     // Encrypt Ticket with Kb  -> ciphertext[]
     unsigned cipherTktLen = encrypt(plaintext, (unsigned)tktPlainLen,
