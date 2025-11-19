@@ -537,68 +537,66 @@ static unsigned char   ciphertext2[ CIPHER_LEN_MAX    ] ; // Temporarily store o
 size_t MSG2_new( FILE *log , uint8_t **msg2, const myKey_t *Ka , const myKey_t *Kb , 
                    const myKey_t *Ks , const char *IDa , const char *IDb  , Nonce_t *Na )
 {
-    //Check if NULL pointers
-    if (log == NULL || msg2 == NULL || Ka == NULL || Kb == NULL || Ks == NULL || IDa == NULL || IDb == NULL || Na == NULL)
-    {
-        fprintf( log , "NULL pointer argument passed to MSG2_new()\n" );
-        exitError( "NULL pointer argument passed to MSG2_new()" );
-        fflush(log);
+    // Guard against NULL pointers
+    if (!log || !msg2 || !Ka || !Kb || !Ks || !IDa || !IDb || !Na) {
+        if (log)
+            fprintf(log, "NULL pointer argument passed to MSG2_new()\n");
+        exitError("NULL pointer argument passed to MSG2_new()");
     }
 
-    size_t LenMsg2 = 0;
+    size_t LenMsg2      = 0;
     size_t LenMsg2Plain = 0;
-    
-    //---------------------------------------------------------------------------------------
-    // Construct TktPlain = { Ks  || L(IDa)  || IDa }
-    // in the global scratch buffer plaintext[]
+
+    //------------------------------------------------------------------
+    // 1) Build Ticket plaintext in global plaintext[]
+    //    TicketPlain = Ks || L(IDa) || IDa
+    //------------------------------------------------------------------
     uint8_t *p = plaintext;
 
-    size_t tktlen = 0;
+    size_t lenIDa = strlen(IDa) + 1;       // include '\0'
 
-    size_t lenIDa = strlen(IDa) + 1;
+    // Ks { key || IV }
     memcpy(p, Ks->key, SYMMETRIC_KEY_LEN);
     p += SYMMETRIC_KEY_LEN;
     memcpy(p, Ks->iv, INITVECTOR_LEN);
     p += INITVECTOR_LEN;
+
+    // L(IDa)
     memcpy(p, &lenIDa, sizeof(size_t));
-    tktlen += sizeof(size_t);
+    p += sizeof(size_t);
+
+    // IDa
     memcpy(p, IDa, lenIDa);
     p += lenIDa;
-    tktlen = (size_t)(p - plaintext);
 
-    // Use that global array as a scratch buffer for building the plaintext of the ticket
-    // Compute its encrypted version in the global scratch buffer ciphertext[]
+    size_t tktPlainLen = (size_t)(p - plaintext);
 
-    // Now, set TktCipher = encrypt( Kb , plaintext );
-    // Store the result in the global scratch buffer ciphertext[]
-    unsigned cipherTktLen = encrypt(plaintext, tktlen, Kb->key, Kb->iv, ciphertext);
-
-    if ( cipherTktLen == 0 ){
-        //failed to encrypt
-        printf("failed to encrypt msg2\n");
-        fprintf( log , "failed to encrypt msg2\n" );
-        exitError( "failed to encrypt msg2" );
-        fflush(log);
+    // Encrypt Ticket with Kb  -> ciphertext[]
+    unsigned cipherTktLen = encrypt(plaintext, (unsigned)tktPlainLen,
+                                    Kb->key, Kb->iv, ciphertext);
+    if (cipherTktLen == 0) {
+        fprintf(stderr, "failed to encrypt ticket for MSG2\n");
+        fprintf(log,    "failed to encrypt ticket for MSG2\n");
+        exitError("failed to encrypt ticket for MSG2");
     }
     size_t LenTktCipher = (size_t)cipherTktLen;
-    //---------------------------------------------------------------------------------------
-    // Construct the rest of Message 2 then encrypt it using Ka
-    // MSG2 plain = {  Ks || L(IDb) || IDb  ||  Na || L(TktCipher) || TktCipher }
 
-    // Fill in Msg2 Plaintext:  Ks || L(IDb) || IDb  || L(Na) || Na || lenTktCipher) || TktCipher
-    // Reuse that global array plaintext[] as a scratch buffer for building the plaintext of the MSG2
+    //------------------------------------------------------------------
+    // 2) Build full Msg2 plaintext in plaintext[]
+    //    Msg2Plain = Ks || L(IDb) || IDb || Na || L(TktCipher) || TktCipher
+    //------------------------------------------------------------------
     unsigned char *p_Ks, *p_IDb, *p_Na, *p_TktCipher;
 
     p = plaintext;
 
-    // Ks again at the start of MSG2 plaintext
+    // Ks { key || IV } again at start of M2
     p_Ks = p;
     memcpy(p, Ks->key, SYMMETRIC_KEY_LEN);
     p += SYMMETRIC_KEY_LEN;
     memcpy(p, Ks->iv, INITVECTOR_LEN);
     p += INITVECTOR_LEN;
 
-    // L(IDb) and IDb (with '\0')
+    // L(IDb) and IDb (include '\0')
     size_t LenB = strlen(IDb) + 1;
     memcpy(p, &LenB, sizeof(size_t));
     p += sizeof(size_t);
@@ -607,69 +605,84 @@ size_t MSG2_new( FILE *log , uint8_t **msg2, const myKey_t *Ka , const myKey_t *
     memcpy(p, IDb, LenB);
     p += LenB;
 
-    // Na (NONCELEN bytes)
+    // Na (NONCELEN bytes) – NOTE: Na is a pointer to Nonce_t
     p_Na = p;
-    memcpy(p, Na, NONCELEN);       // assuming Na points to NONCELEN bytes
+    memcpy(p, *Na, NONCELEN);
     p += NONCELEN;
 
     // L(TktCipher)
     memcpy(p, &LenTktCipher, sizeof(size_t));
     p += sizeof(size_t);
 
-    // TktCipher bytes
+    // TktCipher bytes (from ciphertext[])
     p_TktCipher = p;
     memcpy(p, ciphertext, LenTktCipher);
     p += LenTktCipher;
 
     LenMsg2Plain = (size_t)(p - plaintext);
 
-    // Now, encrypt Message 2 using Ka. 
-    // Use the global scratch buffer ciphertext2[] to collect the results
-    unsigned msg2CipherLen = encrypt((uint8_t *)plaintext, (unsigned)LenMsg2Plain,
-        (const uint8_t *)Ka->key, (const uint8_t *)Ka->iv, (uint8_t *)ciphertext2
-    );
+    //------------------------------------------------------------------
+    // 3) Encrypt Msg2 plaintext with Ka -> ciphertext2[]
+    //------------------------------------------------------------------
+    unsigned msg2CipherLen = encrypt(plaintext, (unsigned)LenMsg2Plain,
+                                     Ka->key, Ka->iv, ciphertext2);
     if (msg2CipherLen == 0) {
         fprintf(stderr, "failed to encrypt MSG2\n");
-        if (log) fprintf(log, "failed to encrypt MSG2\n");
+        fprintf(log,    "failed to encrypt MSG2\n");
         exitError("failed to encrypt MSG2");
     }
     LenMsg2 = (size_t)msg2CipherLen;
 
-    // allocate memory on behalf of the caller for a copy of MSG2 ciphertext
+    // Allocate buffer for caller and copy ciphertext
     *msg2 = (uint8_t *)malloc(LenMsg2);
-     if (*msg2 == NULL) {
-         fprintf(stderr, "Out of memory allocating %zu bytes for MSG2\n", LenMsg2);
-         if (log) fprintf(log, "Out of memory allocating %zu bytes for MSG2\n", LenMsg2);
-         exitError("Out of memory allocating MSG2");
-     }
-     memcpy(*msg2, ciphertext2, LenMsg2);
+    if (!*msg2) {
+        fprintf(stderr, "Out of memory allocating %zu bytes for MSG2\n", LenMsg2);
+        fprintf(log,    "Out of memory allocating %zu bytes for MSG2\n", LenMsg2);
+        exitError("Out of memory allocating MSG2");
+    }
+    memcpy(*msg2, ciphertext2, LenMsg2);
 
-    // Copy the encrypted ciphertext to Caller's msg2 buffer.
-
-    fprintf( log , "The following Encrypted MSG2 ( %lu bytes ) has been"
-                   " created by MSG2_new():  \n" ,  LenMsg2  ) ;
+    //------------------------------------------------------------------
+    // 4) Logging (to match expected logs as closely as possible)
+    //------------------------------------------------------------------
+    fprintf(log,
+            "The following Encrypted MSG2 ( %lu bytes ) has been"
+            " created by MSG2_new():  \n",
+            (unsigned long)LenMsg2);
     BIO_dump_indent_fp(log, (const char *)*msg2, (int)LenMsg2, 4);
+    fprintf(log, "\n");
 
-    fprintf( log ,"This is the content of MSG2 ( %lu Bytes ) before Encryption:\n" ,  LenMsg2Plain );  
-    fprintf( log ,"    Ks { key + IV } (%lu Bytes) is:\n" , KEYSIZE );
+    fprintf(log,
+            "This is the content of MSG2 ( %lu Bytes ) before Encryption:\n",
+            (unsigned long)LenMsg2Plain);
+
+    fprintf(log,
+            "    Ks { key + IV } (%lu Bytes) is:\n",
+            (unsigned long)KEYSIZE);
     BIO_dump_indent_fp(log, (const char *)p_Ks, (int)KEYSIZE, 4);
     fprintf(log, "\n");
 
-    fprintf( log ,"    IDb (%lu Bytes) is:\n" , LenB);
+    fprintf(log,
+            "    IDb (%lu Bytes) is:\n",
+            (unsigned long)LenB);
     BIO_dump_indent_fp(log, (const char *)p_IDb, (int)LenB, 4);
     fprintf(log, "\n");
 
-    fprintf( log ,"    Na (%lu Bytes) is:\n" , NONCELEN);
+    fprintf(log,
+            "    Na (%lu Bytes) is:\n",
+            (unsigned long)NONCELEN);
     BIO_dump_indent_fp(log, (const char *)p_Na, (int)NONCELEN, 4);
     fprintf(log, "\n");
 
-    fprintf( log ,"    Encrypted Ticket (%lu Bytes) is\n" ,  LenTktCipher );
+    fprintf(log,
+            "    Encrypted Ticket (%lu Bytes) is\n",
+            (unsigned long)LenTktCipher);
     BIO_dump_indent_fp(log, (const char *)p_TktCipher, (int)LenTktCipher, 4);
     fprintf(log, "\n");
 
-    fflush( log ) ;    
-    
-    return LenMsg2 ;    
+    fflush(log);
+
+    return LenMsg2;
 
 }
 

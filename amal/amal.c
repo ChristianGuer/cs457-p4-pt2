@@ -51,7 +51,14 @@ int main ( int argc , char * argv[] )
     int      fd_A2K , fd_K2A , fd_A2B , fd_B2A  ;
     FILE    *log ;
 
-    char *developerName = "Code by STUDENTS_LAST_NAMES" ;
+    char *developerName = "Code by Guerrero and Rauch" ;
+
+    /* ---- PA-04 Part Two state for Messages 2+ ---- */
+    myKey_t  Ks; // Session key from KDC
+    char    *IDb_fromKDC = NULL;
+    Nonce_t  Na_fromKDC;
+    size_t   lenTktCipher = 0;
+    uint8_t *tktCipher    = NULL;
 
     fprintf( stdout , "Starting Amal's      %s.\n" , developerName  ) ;
     
@@ -163,6 +170,24 @@ int main ( int argc , char * argv[] )
     BANNER( log ) ;
     fprintf( log , "         MSG2 Receive\n");
     BANNER( log ) ;
+
+    /* Call library function to read & decrypt MSG2 from KDC.
+       This should:
+         - read encrypted MSG2 from fd_K2A
+         - decrypt using Ka
+         - fill Ks, IDb_fromKDC, Na_fromKDC, lenTktCipher, tktCipher
+         - log all the internal fields to logAmal.txt
+     */
+    MSG2_receive( log,
+                  fd_K2A,          // read-from-KDC FD
+                  &Ka,             // Amal's master key with KDC
+                  &Ks,             // out: session key Ks
+                  &IDb_fromKDC,    // out: dynamically allocated IDb string
+                  &Na_fromKDC,     // out: Na echoed back
+                  &lenTktCipher,   // out: length of ticket cipher
+                  &tktCipher );    // out: pointer to ticket cipher buffer
+
+    fflush( log );
 
     //*************************************
     // Construct & Send    Message 3
