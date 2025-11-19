@@ -697,13 +697,177 @@ size_t MSG2_new( FILE *log , uint8_t **msg2, const myKey_t *Ka , const myKey_t *
 void MSG2_receive( FILE *log , int fd , const myKey_t *Ka , myKey_t *Ks, char **IDb , 
                        Nonce_t *Na , size_t *lenTktCipher , uint8_t **tktCipher )
 {
+    if( log == NULL || Ka == NULL || Ks == NULL || IDb == NULL ||
+        Na == NULL || lenTktCipher == NULL || tktCipher == NULL )
+    {
+        if( log )
+            fprintf( log , "NULL pointer argument passed to MSG2_receive()\n" );
+        exitError( "NULL pointer argument passed to MSG2_receive()" );
+    }
 
+    size_t  LenMsg2 = 0 ;
 
+    // 1) Read Len(MSG2)
+    if( read( fd , &LenMsg2 , sizeof(size_t) ) != (ssize_t)sizeof(size_t) )
+    {
+        fprintf( log , "Unable to receive all %lu bytes of Len(MSG2) "
+                       "in MSG2_receive() ... EXITING\n" ,
+                 (unsigned long)sizeof(size_t) );
+        fflush( log );  fclose( log );
+        exitError( "Unable to receive Len(MSG2) in MSG2_receive()" );
+    }
 
-    fprintf( log ,"MSG2_receive() got the following Encrypted MSG2 ( %lu bytes ) Successfully\n" 
-                 , .... );
+    if( LenMsg2 > CIPHER_LEN_MAX )
+    {
+        fprintf( log , "Encrypted MSG2 length %lu exceeds CIPHER_LEN_MAX (%d)\n",
+                 (unsigned long)LenMsg2 , CIPHER_LEN_MAX );
+        fflush( log );  fclose( log );
+        exitError( "Encrypted MSG2 too large in MSG2_receive()" );
+    }
 
+    // 2) Read encrypted MSG2 into ciphertext[]
+    if( read( fd , ciphertext , LenMsg2 ) != (ssize_t)LenMsg2 )
+    {
+        fprintf( log , "Unable to receive all %lu bytes of MSG2 "
+                       "in MSG2_receive() ... EXITING\n" ,
+                 (unsigned long)LenMsg2 );
+        fflush( log );  fclose( log );
+        exitError( "Unable to receive MSG2 in MSG2_receive()" );
+    }
 
+    fprintf( log ,
+             "MSG2_receive() got the following Encrypted MSG2 ( %lu bytes ) Successfully\n",
+             (unsigned long)LenMsg2 );
+    BIO_dump_indent_fp( log , (const char *)ciphertext , (int)LenMsg2 , 4 );
+    fprintf( log , "\n" );
+
+    // 3) Decrypt MSG2 using Amal's master key Ka
+    unsigned LenPlain =
+        decrypt( ciphertext , (unsigned)LenMsg2 , Ka->key , Ka->iv , decryptext );
+    if( LenPlain == 0 || LenPlain > PLAINTEXT_LEN_MAX )
+    {
+        fprintf( log , "Decryption of MSG2 failed or produced invalid length %u\n",
+                 LenPlain );
+        fflush( log );  fclose( log );
+        exitError( "Decryption failed in MSG2_receive()" );
+    }
+
+    // 4) Parse plaintext: Ks || L(IDb) || IDb || Na || L(TktCipher) || TktCipher
+    uint8_t *p     = decryptext ;
+    uint8_t *p_end = decryptext + LenPlain ;
+
+    uint8_t *p_Ks , *p_IDb , *p_Na , *p_TktCipher ;
+
+    // Ks { key || IV }
+    if( (size_t)(p_end - p) < KEYSIZE )
+    {
+        fprintf( log , "MSG2 plaintext too short for Ks in MSG2_receive()\n" );
+        fflush( log );  fclose( log );
+        exitError( "Bad MSG2 format (Ks)" );
+    }
+
+    p_Ks = p;
+    memcpy( Ks->key , p , SYMMETRIC_KEY_LEN );
+    p += SYMMETRIC_KEY_LEN;
+    memcpy( Ks->iv  , p , INITVECTOR_LEN   );
+    p += INITVECTOR_LEN;
+
+    // L(IDb)
+    if( (size_t)(p_end - p) < sizeof(size_t) )
+    {
+        fprintf( log , "MSG2 plaintext too short for Len(IDb) in MSG2_receive()\n" );
+        fflush( log );  fclose( log );
+        exitError( "Bad MSG2 format (LenB)" );
+    }
+    size_t LenB = 0 ;
+    memcpy( &LenB , p , sizeof(size_t) );
+    p += sizeof(size_t);
+
+    if( (size_t)(p_end - p) < LenB )
+    {
+        fprintf( log , "MSG2 plaintext too short for IDb in MSG2_receive()\n" );
+        fflush( log );  fclose( log );
+        exitError( "Bad MSG2 format (IDb)" );
+    }
+
+    // IDb (null-terminated string as sent by KDC)
+    *IDb = (char *)malloc( LenB );
+    if( *IDb == NULL )
+    {
+        fprintf( log , "Out of memory allocating %lu bytes for IDb in MSG2_receive()\n",
+                 (unsigned long)LenB );
+        fflush( log );  fclose( log );
+        exitError( "Out of memory in MSG2_receive() for IDb" );
+    }
+    p_IDb = p;
+    memcpy( *IDb , p , LenB );
+    p += LenB;
+
+    // Na
+    if( (size_t)(p_end - p) < NONCELEN )
+    {
+        fprintf( log , "MSG2 plaintext too short for Na in MSG2_receive()\n" );
+        fflush( log );  fclose( log );
+        exitError( "Bad MSG2 format (Na)" );
+    }
+    p_Na = p;
+    memcpy( *Na , p , NONCELEN );
+    p += NONCELEN;
+
+    // L(TktCipher)
+    if( (size_t)(p_end - p) < sizeof(size_t) )
+    {
+        fprintf( log , "MSG2 plaintext too short for Len(TktCipher) in MSG2_receive()\n" );
+        fflush( log );  fclose( log );
+        exitError( "Bad MSG2 format (LenTktCipher)" );
+    }
+    size_t tLen = 0 ;
+    memcpy( &tLen , p , sizeof(size_t) );
+    p += sizeof(size_t);
+
+    if( (size_t)(p_end - p) < tLen )
+    {
+        fprintf( log , "MSG2 plaintext too short for TktCipher in MSG2_receive()\n" );
+        fflush( log );  fclose( log );
+        exitError( "Bad MSG2 format (TktCipher)" );
+    }
+
+    *lenTktCipher = tLen ;
+    *tktCipher = (uint8_t *)malloc( tLen );
+    if( *tktCipher == NULL )
+    {
+        fprintf( log , "Out of memory allocating %lu bytes for TktCipher in MSG2_receive()\n",
+                 (unsigned long)tLen );
+        fflush( log );  fclose( log );
+        exitError( "Out of memory in MSG2_receive() for TktCipher" );
+    }
+    p_TktCipher = p;
+    memcpy( *tktCipher , p , tLen );
+    p += tLen;
+
+    // Log the decrypted fields for debugging
+    fprintf( log ,
+             "Here is the content of MSG2 ( %u Bytes ) after Decryption in MSG2_receive():\n",
+             LenPlain );
+
+    fprintf( log , "    Ks { key + IV } (%lu Bytes) is:\n" , (unsigned long)KEYSIZE );
+    BIO_dump_indent_fp( log , (const char *)p_Ks , (int)KEYSIZE , 4 );
+    fprintf( log , "\n" );
+
+    fprintf( log , "    IDb (%lu Bytes) is:\n" , (unsigned long)LenB );
+    BIO_dump_indent_fp( log , (const char *)p_IDb , (int)LenB , 4 );
+    fprintf( log , "\n" );
+
+    fprintf( log , "    Na (%lu Bytes) is:\n" , (unsigned long)NONCELEN );
+    BIO_dump_indent_fp( log , (const char *)p_Na , (int)NONCELEN , 4 );
+    fprintf( log , "\n" );
+
+    fprintf( log , "    Encrypted Ticket (%lu Bytes) is\n" ,
+             (unsigned long)*lenTktCipher );
+    BIO_dump_indent_fp( log , (const char *)p_TktCipher , (int)*lenTktCipher , 4 );
+    fprintf( log , "\n" );
+
+    fflush( log );
 }
 
 //-----------------------------------------------------------------------------
