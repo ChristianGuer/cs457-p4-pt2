@@ -880,14 +880,31 @@ size_t MSG3_new( FILE *log , uint8_t **msg3 , const size_t lenTktCipher , const 
                    const Nonce_t *Na2 )
 {
 
-    size_t    LenMsg3 ;
+    // size_t    LenMsg3 ;
 
-    fprintf( log , "The following MSG3 ( %lu bytes ) has been created by "
-                   "MSG3_new ():\n" , LenMsg3 ) ;
-    BIO_dump_indent_fp( log , *msg3 , LenMsg3 , 4 ) ;    fprintf( log , "\n" ) ;    
-    fflush( log ) ;    
+    // fprintf( log , "The following MSG3 ( %lu bytes ) has been created by "
+    //                "MSG3_new ():\n" , LenMsg3 ) ;
+    // BIO_dump_indent_fp( log , *msg3 , LenMsg3 , 4 ) ;    fprintf( log , "\n" ) ;    
+    // fflush( log ) ;    
 
-    return( LenMsg3 ) ;
+    // return( LenMsg3 ) ;
+
+    // *** TEMP STUB ***
+    (void)lenTktCipher;
+    (void)tktCipher;
+    (void)Na2;
+
+    if (msg3) {
+        *msg3 = NULL;
+    }
+
+    if (log) {
+        fprintf(log,
+                "MSG3_new() STUB CALLED – not implemented yet (ignored for MSG2 tests).\n");
+        fflush(log);
+    }
+
+    return 0;   // no bytes in stub
 
 }
 
@@ -903,16 +920,30 @@ void MSG3_receive( FILE *log , int fd , const myKey_t *Kb , myKey_t *Ks , char *
 
 
 
-    fprintf( log ,"The following Encrypted TktCipher ( %lu bytes ) was received by MSG3_receive()\n" 
-                 , ....  );
-    BIO_dump_indent_fp( log , ciphertext , lenTktCipher , 4 ) ;   fprintf( log , "\n");
-    fflush( log ) ;
+    // fprintf( log ,"The following Encrypted TktCipher ( %lu bytes ) was received by MSG3_receive()\n" 
+    //              , ....  );
+    // BIO_dump_indent_fp( log , ciphertext , lenTktCipher , 4 ) ;   fprintf( log , "\n");
+    // fflush( log ) ;
 
 
 
-    fprintf( log ,"Here is the Decrypted Ticket ( %lu bytes ) in MSG3_receive():\n" , lenTktPlain ) ;
-    BIO_dump_indent_fp( log , decryptext , ..... , 4 ) ;   fprintf( log , "\n");
-    fflush( log ) ;
+    // fprintf( log ,"Here is the Decrypted Ticket ( %lu bytes ) in MSG3_receive():\n" , lenTktPlain ) ;
+    // BIO_dump_indent_fp( log , decryptext , ..... , 4 ) ;   fprintf( log , "\n");
+    // fflush( log ) ;
+
+
+    // *** TEMP STUB ***
+    (void)fd;
+    (void)Kb;
+    (void)Ks;
+    (void)IDa;
+    (void)Na2;
+
+    if (log) {
+        fprintf(log,
+                "MSG3_receive() STUB CALLED – not implemented yet (ignored for MSG2 tests).\n");
+        fflush(log);
+    }
 
 
 
@@ -929,7 +960,7 @@ void MSG3_receive( FILE *log , int fd , const myKey_t *Kb , myKey_t *Ks , char *
 size_t  MSG4_new( FILE *log , uint8_t **msg4, const myKey_t *Ks , Nonce_t *fNa2 , Nonce_t *Nb )
 {
 
-    size_t LenMsg4 ;
+    // size_t LenMsg4 ;
 
     // Construct MSG4 Plaintext = { f(Na2)  ||  Nb }
     // Use the global scratch buffer plaintext[] for MSG4 plaintext and fill it in with component values
@@ -939,16 +970,33 @@ size_t  MSG4_new( FILE *log , uint8_t **msg4, const myKey_t *Ks , Nonce_t *fNa2 
     // Use the global scratch buffer ciphertext[] to collect the result. Make sure it fits.
 
     // Now allocate a buffer for the caller, and copy the encrypted MSG4 to it
-    *msg4 = malloc( .... ) ;
+    // *msg4 = malloc( .... ) ;
 
 
 
     
-    fprintf( log , "The following Encrypted MSG4 ( %lu bytes ) has been"
-                   " created by MSG4_new ():  \n" , LenMsg4 ) ;
-    BIO_dump_indent_fp( log , *msg4 , ... ) ;
+    // fprintf( log , "The following Encrypted MSG4 ( %lu bytes ) has been"
+    //                " created by MSG4_new ():  \n" , LenMsg4 ) ;
+    // BIO_dump_indent_fp( log , *msg4 , ... ) ;
 
-    return LenMsg4 ;
+    // return LenMsg4 ;
+
+    // *** TEMP STUB ***
+    (void)Ks;
+    (void)fNa2;
+    (void)Nb;
+
+    if (msg4) {
+        *msg4 = NULL;
+    }
+
+    if (log) {
+        fprintf(log,
+                "MSG4_new() STUB CALLED – not implemented yet (ignored for MSG2 tests).\n");
+        fflush(log);
+    }
+
+    return 0;
     
 
 }
@@ -959,7 +1007,17 @@ size_t  MSG4_new( FILE *log , uint8_t **msg4, const myKey_t *Ks , Nonce_t *fNa2 
 
 void  MSG4_receive( FILE *log , int fd , const myKey_t *Ks , Nonce_t *rcvd_fNa2 , Nonce_t *Nb )
 {
+    // *** TEMP STUB ***
+    (void)fd;
+    (void)Ks;
+    (void)rcvd_fNa2;
+    (void)Nb;
 
+    if (log) {
+        fprintf(log,
+                "MSG4_receive() STUB CALLED – not implemented yet (ignored for MSG2 tests).\n");
+        fflush(log);
+    }
 
 }
 
@@ -972,7 +1030,7 @@ void  MSG4_receive( FILE *log , int fd , const myKey_t *Ks , Nonce_t *rcvd_fNa2 
 
 size_t  MSG5_new( FILE *log , uint8_t **msg5, const myKey_t *Ks ,  Nonce_t *fNb )
 {
-    size_t  LenMSG5cipher  ;
+    // size_t  LenMSG5cipher  ;
 
     // Construct MSG5 Plaintext  = {  f(Nb)  }
     // Use the global scratch buffer plaintext[] for MSG5 plaintext. Make sure it fits 
@@ -983,15 +1041,31 @@ size_t  MSG5_new( FILE *log , uint8_t **msg5, const myKey_t *Ks ,  Nonce_t *fNb 
 
 
     // Now allocate a buffer for the caller, and copy the encrypted MSG5 to it
-    *msg5 = malloc( ... ) ;
+    // *msg5 = malloc( ... ) ;
 
 
-    fprintf( log , "The following Encrypted MSG5 ( %lu bytes ) has been"
-                   " created by MSG5_new ():  \n" , LenMSG5cipher ) ;
-    BIO_dump_indent_fp( log , *msg5 , LenMSG5cipher , 4 ) ;    fprintf( log , "\n" ) ;    
-    fflush( log ) ;    
+    // fprintf( log , "The following Encrypted MSG5 ( %lu bytes ) has been"
+    //                " created by MSG5_new ():  \n" , LenMSG5cipher ) ;
+    // BIO_dump_indent_fp( log , *msg5 , LenMSG5cipher , 4 ) ;    fprintf( log , "\n" ) ;    
+    // fflush( log ) ;    
 
-    return LenMSG5cipher ;
+    // return LenMSG5cipher ;
+
+    // *** TEMP STUB ***
+    (void)Ks;
+    (void)fNb;
+
+    if (msg5) {
+        *msg5 = NULL;
+    }
+
+    if (log) {
+        fprintf(log,
+                "MSG5_new() STUB CALLED – not implemented yet (ignored for MSG2 tests).\n");
+        fflush(log);
+    }
+
+    return 0;
 
 }
 
@@ -1002,7 +1076,7 @@ size_t  MSG5_new( FILE *log , uint8_t **msg5, const myKey_t *Ks ,  Nonce_t *fNb 
 void  MSG5_receive( FILE *log , int fd , const myKey_t *Ks , Nonce_t *fNb )
 {
 
-    size_t    LenMSG5cipher ;
+    // size_t    LenMSG5cipher ;
     
     // Read Len( Msg5 ) followed by reading Msg5 itself
     // Always make sure read() and write() succeed
@@ -1010,7 +1084,7 @@ void  MSG5_receive( FILE *log , int fd , const myKey_t *Ks , Nonce_t *fNb )
     // Make sure it fits.
 
 
-    fprintf( log ,"The following Encrypted MSG5 ( %lu bytes ) has been received:\n" , LenMSG5cipher );
+    // fprintf( log ,"The following Encrypted MSG5 ( %lu bytes ) has been received:\n" , LenMSG5cipher );
 
 
     // Now, Decrypt MSG5 using Ks
@@ -1019,6 +1093,18 @@ void  MSG5_receive( FILE *log , int fd , const myKey_t *Ks , Nonce_t *fNb )
 
 
     // Parse MSG5 into its components f( Nb )
+
+
+    // *** TEMP STUB ***
+    (void)fd;
+    (void)Ks;
+    (void)fNb;
+
+    if (log) {
+        fprintf(log,
+                "MSG5_receive() STUB CALLED – not implemented yet (ignored for MSG2 tests).\n");
+        fflush(log);
+    }
 
 
 
@@ -1033,4 +1119,23 @@ void     fNonce( Nonce_t r , Nonce_t n )
 {
     // Note that the nonces are store in Big-Endian byte order
     // This affects how you do arithmetice on the noces, e.g. when you add 1
+
+    /* Treat the nonce as a big-endian byte array.
+     * We compute r = n + 1 (mod 2^(8*NONCELEN)) by doing
+     * a byte-wise add with carry starting from the last byte
+     * (least-significant in big-endian).
+     */
+    unsigned char       *dst = (unsigned char *)r;
+    const unsigned char *src = (const unsigned char *)n;
+
+    int carry = 1;  // we are adding 1
+
+    for( int i = (int)NONCELEN - 1 ; i >= 0 ; --i )
+    {
+        unsigned int sum = (unsigned int)src[i] + (unsigned int)carry;
+        dst[i]  = (unsigned char)(sum & 0xFFu);
+        carry   = (sum >> 8) & 0x1u;      // 1 if there was overflow, else 0
+    }
+    /* If there is still a carry here, it is discarded, which is exactly
+       the mod 2^b behavior. For example, 0xFF..FF + 1 -> 0x00..00. */
 }
