@@ -544,6 +544,7 @@ size_t MSG2_new( FILE *log , uint8_t **msg2, const myKey_t *Ka , const myKey_t *
         exitError("NULL pointer argument passed to MSG2_new()");
     }
 
+    // init lengths
     size_t LenMsg2      = 0;
     size_t LenMsg2Plain = 0;
 
@@ -551,26 +552,28 @@ size_t MSG2_new( FILE *log , uint8_t **msg2, const myKey_t *Ka , const myKey_t *
     // 1) Build Ticket plaintext in global plaintext[]
     //    TicketPlain = Ks || L(IDa) || IDa
     //------------------------------------------------------------------
-    uint8_t *p = plaintext;
+    uint8_t *p = plaintext;                // For Traversal
 
-    size_t lenIDa = strlen(IDa) + 1;       // include '\0'
+    size_t lenIDa = strlen(IDa) + 1;       // IDa
 
-    // Ks { key || IV }
+    // Copy Ks { key || IV } and advance p
     memcpy(p, Ks->key, SYMMETRIC_KEY_LEN);
     p += SYMMETRIC_KEY_LEN;
     memcpy(p, Ks->iv, INITVECTOR_LEN);
     p += INITVECTOR_LEN;
 
-    // L(IDa)
+    // Copy L(IDa) and advance p
     memcpy(p, &lenIDa, sizeof(size_t));
     p += sizeof(size_t);
 
-    // IDa
+    // Copy IDa and advance p
     memcpy(p, IDa, lenIDa);
     p += lenIDa;
 
+    // Define ticket plaintxt length
     size_t tktPlainLen = (size_t)(p - plaintext);
 
+    // Log plaintxt ticket
     fprintf(log, "Plaintext Ticket (%lu Bytes) is\n", (unsigned long)tktPlainLen);
     BIO_dump_indent_fp(log, plaintext, tktPlainLen, 4);
     fprintf(log, "\n");
@@ -583,46 +586,49 @@ size_t MSG2_new( FILE *log , uint8_t **msg2, const myKey_t *Ka , const myKey_t *
         fprintf(log,    "failed to encrypt ticket for MSG2\n");
         exitError("failed to encrypt ticket for MSG2");
     }
+    // Define encrypted ticket length
     size_t LenTktCipher = (size_t)cipherTktLen;
 
     //------------------------------------------------------------------
     // 2) Build full Msg2 plaintext in plaintext[]
     //    Msg2Plain = Ks || L(IDb) || IDb || Na || L(TktCipher) || TktCipher
     //------------------------------------------------------------------
-    unsigned char *p_Ks, *p_IDb, *p_Na, *p_TktCipher;
+    unsigned char *p_Ks, *p_IDb, *p_Na, *p_TktCipher; // Init pointers for logging (like bookmarks)
 
-    p = plaintext;
+    p = plaintext;                                    // Reset p (for traversal)
 
-    // Ks { key || IV } again at start of M2
+    // Copy Ks { key || IV } again at start of M2 and advance p
     p_Ks = p;
     memcpy(p, Ks->key, SYMMETRIC_KEY_LEN);
     p += SYMMETRIC_KEY_LEN;
     memcpy(p, Ks->iv, INITVECTOR_LEN);
     p += INITVECTOR_LEN;
 
-    // L(IDb) and IDb (include '\0')
+    // Copy L(IDb) and advance p
     size_t LenB = strlen(IDb) + 1;
     memcpy(p, &LenB, sizeof(size_t));
     p += sizeof(size_t);
 
+    // Copy IDb and advance p
     p_IDb = p;
     memcpy(p, IDb, LenB);
     p += LenB;
 
-    // Na (NONCELEN bytes) – NOTE: Na is a pointer to Nonce_t
+    // Copy Na (Na is a pointer to Nonce_t) and advance p
     p_Na = p;
     memcpy(p, *Na, NONCELEN);
     p += NONCELEN;
 
-    // L(TktCipher)
+    // Copy L(TktCipher) and advance p
     memcpy(p, &LenTktCipher, sizeof(size_t));
     p += sizeof(size_t);
 
-    // TktCipher bytes (from ciphertext[])
+    // Copy encrypted ticket and advance p
     p_TktCipher = p;
     memcpy(p, ciphertext, LenTktCipher);
     p += LenTktCipher;
 
+    // Define entire msg2 plaintxt length
     LenMsg2Plain = (size_t)(p - plaintext);
 
     //------------------------------------------------------------------
@@ -635,19 +641,21 @@ size_t MSG2_new( FILE *log , uint8_t **msg2, const myKey_t *Ka , const myKey_t *
         fprintf(log,    "failed to encrypt MSG2\n");
         exitError("failed to encrypt MSG2");
     }
+    // Define entire encrypted msg2 length
     LenMsg2 = (size_t)msg2CipherLen;
 
-    // Allocate buffer for caller and copy ciphertext
+    // Allocate buffer for caller
     *msg2 = (uint8_t *)malloc(LenMsg2);
     if (!*msg2) {
         fprintf(stderr, "Out of memory allocating %zu bytes for MSG2\n", LenMsg2);
         fprintf(log,    "Out of memory allocating %zu bytes for MSG2\n", LenMsg2);
         exitError("Out of memory allocating MSG2");
     }
+    // Copy full ciphertext
     memcpy(*msg2, ciphertext2, LenMsg2);
 
     //------------------------------------------------------------------
-    // 4) Logging (to match expected logs as closely as possible)
+    // 4) Logging
     //------------------------------------------------------------------
     fprintf(log,
             "The following Encrypted MSG2 ( %lu bytes ) has been"
