@@ -1,0 +1,22 @@
+***************************************************
+Starting the KDC
+***************************************************
+
+<readFrom Amal> FD=3 , <sendTo Amal> FD=6
+
+Amal has this Master Ka { key , IV }
+    0000 - 01 27 48 03 a4 b0 eb 2f-1c bb 05 18 09 6d 45 d9   .'H..../.....mE.
+    0010 - aa 5b 77 69 b8 12 0b 5b-6b d5 cd 59 f2 4c 7c f7   .[wi...[k..Y.L|.
+
+    0000 - 4c 6d 4f a6 a5 91 37 ed-7e fe 34 54 24 4b a0 ed   LmO...7.~.4T$K..
+
+Basim has this Master Kb { key , IV }
+    0000 - 72 17 92 80 3c 7d 1d c5-6a 13 78 1d e0 55 10 21   r...<}..j.x..U.!
+    0010 - 63 48 e5 22 27 b7 22 72-ce d9 07 7e 7c 8a 66 6c   cH."'."r...~|.fl
+
+    0000 - c4 2e 33 75 bd 4b a8 f1-0f 9a d1 9d c6 14 18 ef   ..3u.K..........
+
+***************************************************
+         MSG1 Receive
+***************************************************
+Unable to receive all 8 bytes of Len(IDA) in MSG1_receive() ... EXITING
